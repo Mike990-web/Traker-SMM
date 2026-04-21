@@ -617,13 +617,13 @@
 // ║  Siehe beiliegende Anleitung (setup-anleitung.md)         ║
 // ╚═══════════════════════════════════════════════════════════╝
 const firebaseConfig = {
-  apiKey: "AIzaSyB7DcFwhKORvbB3sDd7vpXjOOnIngxhjjU",
-  authDomain: "smm-tracker-insta.firebaseapp.com",
-  databaseURL: "https://smm-tracker-insta-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "smm-tracker-insta",
-  storageBucket: "smm-tracker-insta.firebasestorage.app",
-  messagingSenderId: "69706672023",
-  appId: "1:69706672023:web:2fc6d195dd6da18ab2c6d2"
+  apiKey:            "DEIN_API_KEY",
+  authDomain:        "DEIN_PROJEKT.firebaseapp.com",
+  databaseURL:       "https://DEIN_PROJEKT-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "DEIN_PROJEKT",
+  storageBucket:     "DEIN_PROJEKT.appspot.com",
+  messagingSenderId: "000000000000",
+  appId:             "DEIN_APP_ID"
 };
 
 // Pfad in der Datenbank (kann angepasst werden)
@@ -638,6 +638,8 @@ let weeks = [];
 let counter = 0;
 let saveTimeout = null;
 let isInitialized = false;
+let localSaveInProgress = false;
+let localSaveTimer = null;
 
 const METRICS = [
   { key: 'reach',         label: '👁️ Reach' },
@@ -665,6 +667,11 @@ function save() {
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => {
     setSyncStatus('syncing', 'speichert…');
+    // Block re-render from own save echo
+    localSaveInProgress = true;
+    if (localSaveTimer) clearTimeout(localSaveTimer);
+    localSaveTimer = setTimeout(() => { localSaveInProgress = false; }, 2000);
+
     weeksRef.set(weeks)
       .then(() => {
         setSyncStatus('live', 'live sync ✓');
@@ -672,6 +679,7 @@ function save() {
       .catch(err => {
         console.error('Save error:', err);
         setSyncStatus('error', 'Fehler!');
+        localSaveInProgress = false;
       });
   }, 400);
 }
@@ -680,28 +688,46 @@ function save() {
 function startRealtimeSync() {
   weeksRef.on('value', (snapshot) => {
     const data = snapshot.val();
-    if (data && Array.isArray(data)) {
-      weeks = data;
-    } else {
-      weeks = [];
-    }
 
-    // Re-render all cards
-    document.getElementById('cards-container').innerHTML = '';
-    weeks.forEach(w => renderCard(w, false));
-    updateEmptyState();
-
-    // If overview is active, re-render it too
-    const overviewActive = document.getElementById('view-overview').classList.contains('active');
-    if (overviewActive) renderOverview();
-
+    // On initial load: always render
     if (!isInitialized) {
+      if (data && Array.isArray(data)) {
+        weeks = data;
+      } else {
+        weeks = [];
+      }
+      document.getElementById('cards-container').innerHTML = '';
+      weeks.forEach(w => renderCard(w, false));
+      updateEmptyState();
+
       isInitialized = true;
       const overlay = document.getElementById('loading-overlay');
       overlay.classList.add('hidden');
       setTimeout(() => overlay.remove(), 500);
       setSyncStatus('live', 'live sync ✓');
+      return;
     }
+
+    // Skip re-render if this is our own save echoing back
+    if (localSaveInProgress) {
+      localSaveInProgress = false;
+      return;
+    }
+
+    // External change from another device → full re-render
+    if (data && Array.isArray(data)) {
+      weeks = data;
+    } else {
+      weeks = [];
+    }
+    document.getElementById('cards-container').innerHTML = '';
+    weeks.forEach(w => renderCard(w, false));
+    updateEmptyState();
+
+    const overviewActive = document.getElementById('view-overview').classList.contains('active');
+    if (overviewActive) renderOverview();
+
+    setSyncStatus('live', 'live sync ✓');
   }, (err) => {
     console.error('Realtime sync error:', err);
     setSyncStatus('error', 'Verbindungsfehler');
