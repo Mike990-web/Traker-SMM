@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMM Tracker · Stronger Together</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080808;
+    --surface: rgba(255,255,255,0.03);
+    --border: rgba(255,255,255,0.07);
+    --accent: #E1306C;
+    --accent2: #F77737;
+    --text: #f0f0f0;
+    --muted: #555;
+    --subtle: #333;
+    --grad: linear-gradient(135deg, #E1306C, #F77737);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Instrument Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(8,8,8,0.85);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 24px;
+  }
+
+  .header-inner {
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo-block { display: flex; flex-direction: column; gap: 2px; }
+
+  .logo-tag {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    background: var(--grad);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .logo-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  .logo-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .tab-group { display: flex; gap: 6px; flex-shrink: 0; }
+
+  .tab-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Instrument Sans', sans-serif;
+    transition: all 0.2s;
+  }
+
+  .tab-btn:hover { border-color: rgba(255,255,255,0.2); color: #aaa; }
+
+  .tab-btn.active {
+    background: rgba(225,48,108,0.15);
+    border-color: rgba(225,48,108,0.4);
+    color: var(--accent);
+  }
+
+  /* ── SYNC INDICATOR ── */
+  .sync-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    transition: all 0.3s;
+  }
+  .sync-indicator .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #555;
+    transition: background 0.3s;
+  }
+  .sync-indicator.syncing .dot { background: var(--accent2); animation: pulse 0.8s infinite; }
+  .sync-indicator.synced .dot { background: #4ade80; }
+  .sync-indicator.error .dot { background: #ef4444; }
+  .sync-indicator.live .dot { background: #4ade80; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+  /* ── LOADING OVERLAY ── */
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    transition: opacity 0.4s;
+  }
+  .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+  .loading-spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 13px; color: var(--muted); }
+
+  /* ── SETUP SCREEN ── */
+  .setup-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .setup-screen.hidden { display: none; }
+  .setup-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 36px;
+    max-width: 500px;
+    width: 100%;
+    text-align: center;
+  }
+  .setup-box h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+  .setup-box p {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+  .setup-box .error-msg {
+    color: #ef4444;
+    font-size: 12px;
+    margin-top: 8px;
+    display: none;
+  }
+
+  /* ── VIEWS ── */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 28px 16px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--subtle);
+  }
+  .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+  .empty-state p { font-size: 15px; color: var(--muted); }
+  .empty-state span { font-size: 13px; color: var(--subtle); display: block; margin-top: 6px; }
+
+  /* ── WEEK CARD ── */
+  .week-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 24px;
+    margin-bottom: 18px;
+    animation: fadeUp 0.3s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .card-header-left { display: flex; gap: 14px; align-items: center; }
+
+  .week-badge {
+    background: var(--grad);
+    border-radius: 12px;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .card-header-right { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  .er-badge {
+    background: rgba(225,48,108,0.12);
+    border: 1px solid rgba(225,48,108,0.25);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 700;
+    font-family: 'DM Mono', monospace;
+    white-space: nowrap;
+  }
+
+  .delete-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .delete-btn:hover { border-color: rgba(225,48,108,0.4); color: var(--accent); }
+
+  input[type="text"], input[type="number"], input[type="date"], select, textarea {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 7px 11px;
+    font-size: 13px;
+    font-family: 'Instrument Sans', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: rgba(225,48,108,0.4);
+    background: rgba(225,48,108,0.04);
+  }
+
+  select option { background: #1a1a1a; }
+
+  label.field-label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+
+  .meta-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+
+  .meta-field { display: flex; flex-direction: column; }
+  .meta-field.grow { flex: 1; min-width: 160px; }
+
+  .week-name-input { font-weight: 700; font-size: 15px; width: 120px; }
+  .date-input { font-size: 12px; color: #aaa; width: 150px; }
+  .caption-input { width: 100%; }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .metric-cell {
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+
+  .metric-cell.er-cell {
+    background: rgba(225,48,108,0.07);
+    border: 1px solid rgba(225,48,108,0.15);
+  }
+
+  .metric-icon-label {
+    font-size: 11px;
+    color: #777;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .metric-cell.er-cell .metric-icon-label { color: rgba(225,48,108,0.7); }
+
+  .metric-input {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 20px !important;
+    font-weight: 500 !important;
+    width: 100%;
+    color: var(--text) !important;
+  }
+
+  .metric-input:focus { background: transparent !important; border: none !important; }
+
+  .er-display {
+    font-family: 'DM Mono', monospace;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--accent);
+    min-height: 28px;
+    line-height: 1.4;
+  }
+
+  .er-display.empty { color: var(--subtle); }
+  .er-sub { font-size: 10px; color: var(--subtle); margin-top: 2px; }
+
+  .qual-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  @media (max-width: 600px) {
+    .qual-grid { grid-template-columns: 1fr; }
+    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    .tab-btn { padding: 6px 10px; font-size: 11px; }
+    .logo-title { font-size: 18px; }
+    .header-inner { flex-wrap: wrap; }
+  }
+
+  .qual-field { display: flex; flex-direction: column; }
+
+  .qual-textarea {
+    width: 100%;
+    resize: vertical;
+    line-height: 1.5;
+    min-height: 70px;
+  }
+
+  .add-btn {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    background: transparent;
+    border: 2px dashed rgba(225,48,108,0.25);
+    border-radius: 18px;
+    color: rgba(225,48,108,0.7);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Instrument Sans', sans-serif;
+    transition: all 0.25s;
+    letter-spacing: 0.02em;
+  }
+
+  .add-btn:hover {
+    border-color: rgba(225,48,108,0.6);
+    color: var(--accent);
+    background: rgba(225,48,108,0.04);
+  }
+
+  /* ── OVERVIEW ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    animation: fadeUp 0.3s ease both;
+  }
+
+  .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+
+  .stat-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    background: var(--grad);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    animation: fadeUp 0.3s ease 0.1s both;
+  }
+
+  .table-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  .table-scroll { overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { background: rgba(255,255,255,0.02); }
+
+  th {
+    padding: 10px 16px;
+    text-align: left;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 11px 16px;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  td.week-label { font-family: 'Instrument Sans', sans-serif; font-weight: 700; color: var(--accent); }
+  td.format-label { font-family: 'Instrument Sans', sans-serif; color: var(--muted); font-size: 12px; }
+  td.er-col { color: var(--accent); font-weight: 500; }
+  tr:hover td { background: rgba(255,255,255,0.015); }
+
+  .section-divider { height: 1px; background: var(--border); margin: 18px 0; }
+
+  .table-scroll::after {
+    content: '';
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 30px;
+    background: linear-gradient(to left, rgba(8,8,8,0.8), transparent);
+    pointer-events: none;
+  }
+
+  .reset-btn {
+    background: transparent;
+    border: 1px solid rgba(239,68,68,0.25);
+    color: rgba(239,68,68,0.6);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .reset-btn:hover {
+    border-color: rgba(239,68,68,0.5);
+    color: #ef4444;
+    background: rgba(239,68,68,0.06);
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">Verbinde mit Datenbank…</div>
+</div>
+
+<header>
+  <div class="header-inner">
+    <div class="logo-block">
+      <span class="logo-tag">Darmstadt Business School · Instagram</span>
+      <span class="logo-title">SMM Tracker</span>
+      <span class="logo-sub">Campaign 1: Stronger Together</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+      <div class="sync-indicator" id="sync-indicator">
+        <span class="dot"></span>
+        <span class="sync-text">verbinde…</span>
+      </div>
+      <button class="reset-btn" onclick="resetData()" title="Alle Daten löschen">Reset</button>
+      <div class="tab-group">
+        <button class="tab-btn active" onclick="switchView('tracker')">📋 Tracker</button>
+        <button class="tab-btn" onclick="switchView('overview')">📈 Überblick</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="view-tracker" class="view active">
+    <div id="cards-container"></div>
+    <div id="empty-tracker" class="empty-state" style="display:none">
+      <div class="icon">📊</div>
+      <p>Noch keine Wochen eingetragen.</p>
+      <span>Klick auf "＋ Woche hinzufügen" um loszulegen.</span>
+    </div>
+    <button class="add-btn" onclick="addWeek()">＋ Woche hinzufügen</button>
+  </div>
+
+  <div id="view-overview" class="view">
+    <div id="overview-empty" class="empty-state" style="display:none">
+      <div class="icon">📈</div>
+      <p>Noch keine Daten vorhanden.</p>
+      <span>Trag zuerst Reach-Zahlen im Tracker ein.</span>
+    </div>
+    <div id="overview-content" style="display:none">
+      <div class="stats-grid" id="stats-grid"></div>
+      <div class="table-wrap">
+        <div class="table-head">Wochenvergleich</div>
+        <div class="table-scroll" style="position:relative">
+          <table>
+            <thead>
+              <tr>
+                <th>Woche</th><th>Format</th><th>Reach</th><th>Impressions</th>
+                <th>Likes</th><th>Comments</th><th>Saves</th><th>Shares</th>
+                <th>Profil-Besuche</th><th>Link-Klicks</th><th>ER</th>
+              </tr>
+            </thead>
+            <tbody id="overview-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ═══════════════════════════════════════════════════════
+     FIREBASE SDK (v9 compat)
+     ═══════════════════════════════════════════════════════ -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<script>
+// ╔═══════════════════════════════════════════════════════════╗
+// ║  🔧 FIREBASE CONFIG – HIER DEINE DATEN EINTRAGEN!       ║
+// ║                                                           ║
+// ║  Erstelle ein Firebase-Projekt und kopiere die Config     ║
+// ║  aus der Firebase Console hier rein.                      ║
+// ║  Siehe beiliegende Anleitung (setup-anleitung.md)         ║
+// ╚═══════════════════════════════════════════════════════════╝
+const firebaseConfig = {
+  apiKey:            "DEIN_API_KEY",
+  authDomain:        "DEIN_PROJEKT.firebaseapp.com",
+  databaseURL:       "https://DEIN_PROJEKT-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "DEIN_PROJEKT",
+  storageBucket:     "DEIN_PROJEKT.appspot.com",
+  messagingSenderId: "000000000000",
+  appId:             "DEIN_APP_ID"
+};
+
+// Pfad in der Datenbank (kann angepasst werden)
+const DB_PATH = 'smm-tracker/weeks';
+
+// ── Firebase Init ──
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const weeksRef = db.ref(DB_PATH);
+
+let weeks = [];
+let counter = 0;
+let saveTimeout = null;
+let isInitialized = false;
+let localSaveInProgress = false;
+let localSaveTimer = null;
+
+const METRICS = [
+  { key: 'reach',         label: '👁️ Reach' },
+  { key: 'impressions',   label: '📊 Impressions' },
+  { key: 'likes',         label: '❤️ Likes' },
+  { key: 'comments',      label: '💬 Comments' },
+  { key: 'saves',         label: '🔖 Saves' },
+  { key: 'shares',        label: '🔁 Shares' },
+  { key: 'profileVisits', label: '👤 Profil-Besuche' },
+  { key: 'linkClicks',    label: '🔗 Link-Klicks' },
+];
+
+const FORMATS = ['Reel', 'Carousel', 'Static Post', 'Story'];
+
+// ── Sync Indicator ──
+function setSyncStatus(status, text) {
+  const el = document.getElementById('sync-indicator');
+  const textEl = el.querySelector('.sync-text');
+  el.className = 'sync-indicator ' + status;
+  textEl.textContent = text;
+}
+
+// ── Firebase Save (debounced) ──
+function save() {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    setSyncStatus('syncing', 'speichert…');
+    // Block re-render from own save echo
+    localSaveInProgress = true;
+    if (localSaveTimer) clearTimeout(localSaveTimer);
+    localSaveTimer = setTimeout(() => { localSaveInProgress = false; }, 2000);
+
+    weeksRef.set(weeks)
+      .then(() => {
+        setSyncStatus('live', 'live sync ✓');
+      })
+      .catch(err => {
+        console.error('Save error:', err);
+        setSyncStatus('error', 'Fehler!');
+        localSaveInProgress = false;
+      });
+  }, 400);
+}
+
+// ── Firebase Realtime Listener ──
+function startRealtimeSync() {
+  weeksRef.on('value', (snapshot) => {
+    const data = snapshot.val();
+
+    // On initial load: always render
+    if (!isInitialized) {
+      if (data && Array.isArray(data)) {
+        weeks = data;
+      } else {
+        weeks = [];
+      }
+      document.getElementById('cards-container').innerHTML = '';
+      weeks.forEach(w => renderCard(w, false));
+      updateEmptyState();
+
+      isInitialized = true;
+      const overlay = document.getElementById('loading-overlay');
+      overlay.classList.add('hidden');
+      setTimeout(() => overlay.remove(), 500);
+      setSyncStatus('live', 'live sync ✓');
+      return;
+    }
+
+    // Skip re-render if this is our own save echoing back
+    if (localSaveInProgress) {
+      localSaveInProgress = false;
+      return;
+    }
+
+    // External change from another device → full re-render
+    if (data && Array.isArray(data)) {
+      weeks = data;
+    } else {
+      weeks = [];
+    }
+    document.getElementById('cards-container').innerHTML = '';
+    weeks.forEach(w => renderCard(w, false));
+    updateEmptyState();
+
+    const overviewActive = document.getElementById('view-overview').classList.contains('active');
+    if (overviewActive) renderOverview();
+
+    setSyncStatus('live', 'live sync ✓');
+  }, (err) => {
+    console.error('Realtime sync error:', err);
+    setSyncStatus('error', 'Verbindungsfehler');
+
+    if (!isInitialized) {
+      isInitialized = true;
+      const overlay = document.getElementById('loading-overlay');
+      overlay.classList.add('hidden');
+      setTimeout(() => overlay.remove(), 500);
+    }
+  });
+}
+
+function getWeek(id) { return weeks.find(w => w.id === id); }
+
+function calcER(w) {
+  const reach = parseFloat(w.reach);
+  if (!reach) return null;
+  const interactions = ['likes','comments','saves','shares']
+    .reduce((s, k) => s + (parseFloat(w[k]) || 0), 0);
+  return ((interactions / reach) * 100).toFixed(2);
+}
+
+// ── Views ──
+function switchView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    if (b.textContent.toLowerCase().includes(name === 'tracker' ? 'tracker' : 'blick')) {
+      b.classList.add('active');
+    }
+  });
+  if (name === 'overview') renderOverview();
+}
+
+// ── Add / Delete Week ──
+function addWeek() {
+  counter++;
+  const w = {
+    id: Date.now() + counter,
+    index: weeks.length + 1,
+    week: 'Woche ' + (weeks.length + 1),
+    date: '',
+    format: 'Reel',
+    caption: '',
+    reach: '', impressions: '', likes: '', comments: '',
+    saves: '', shares: '', profileVisits: '', linkClicks: '',
+    whatWorked: '', whatDidnt: '', nextSteps: '',
+  };
+  weeks.push(w);
+  save();
+  renderCard(w, true);
+  updateEmptyState();
+}
+
+function deleteWeek(id) {
+  if (!confirm('Diese Woche wirklich löschen?')) return;
+  weeks = weeks.filter(w => w.id !== id);
+  save();
+  const el = document.getElementById('card-' + id);
+  if (el) el.remove();
+  updateEmptyState();
+}
+
+function updateField(id, key, value) {
+  const w = getWeek(id);
+  if (!w) return;
+  w[key] = value;
+  save();
+  const erBadge = document.getElementById('er-badge-' + id);
+  const erDisplay = document.getElementById('er-display-' + id);
+  const er = calcER(w);
+  if (erBadge) {
+    erBadge.style.display = er ? '' : 'none';
+    erBadge.textContent = 'ER: ' + er + '%';
+  }
+  if (erDisplay) {
+    erDisplay.textContent = er ? er + '%' : '—';
+    erDisplay.className = 'er-display' + (er ? '' : ' empty');
+  }
+}
+
+// ── Render Card ──
+function renderCard(w, animate) {
+  const container = document.getElementById('cards-container');
+  const er = calcER(w);
+
+  const div = document.createElement('div');
+  div.className = 'week-card';
+  div.id = 'card-' + w.id;
+  if (!animate) div.style.animationDelay = '0s';
+
+  const formatOptions = FORMATS.map(f =>
+    `<option value="${f}" ${w.format === f ? 'selected' : ''}>${f}</option>`
+  ).join('');
+
+  const metricCells = METRICS.map(m => `
+    <div class="metric-cell">
+      <div class="metric-icon-label">${m.label}</div>
+      <input type="number" class="metric-input" placeholder="—"
+        value="${w[m.key]}"
+        onchange="updateField(${w.id}, '${m.key}', this.value)"
+        oninput="updateField(${w.id}, '${m.key}', this.value)">
+    </div>
+  `).join('');
+
+  div.innerHTML = `
+    <div class="card-header">
+      <div class="card-header-left">
+        <div class="week-badge">${w.index}</div>
+        <div>
+          <input type="text" class="week-name-input" value="${esc(w.week)}"
+            placeholder="z.B. Woche 1"
+            oninput="updateField(${w.id}, 'week', this.value)">
+          <br>
+          <input type="date" class="date-input" value="${w.date}"
+            onchange="updateField(${w.id}, 'date', this.value)"
+            style="margin-top:5px">
+        </div>
+      </div>
+      <div class="card-header-right">
+        <span class="er-badge" id="er-badge-${w.id}" ${er ? '' : 'style="display:none"'}>
+          ER: ${er ? er + '%' : ''}
+        </span>
+        <button class="delete-btn" onclick="deleteWeek(${w.id})" title="Löschen">✕</button>
+      </div>
+    </div>
+
+    <div class="meta-row">
+      <div class="meta-field">
+        <label class="field-label">Format</label>
+        <select onchange="updateField(${w.id}, 'format', this.value)">${formatOptions}</select>
+      </div>
+      <div class="meta-field grow">
+        <label class="field-label">Caption-Snippet</label>
+        <input type="text" class="caption-input" placeholder="Erste Zeile der Caption..."
+          value="${esc(w.caption)}"
+          oninput="updateField(${w.id}, 'caption', this.value)">
+      </div>
+    </div>
+
+    <div class="metrics-grid">
+      ${metricCells}
+      <div class="metric-cell er-cell">
+        <div class="metric-icon-label">📈 Engagement Rate</div>
+        <div class="er-display ${er ? '' : 'empty'}" id="er-display-${w.id}">
+          ${er ? er + '%' : '—'}
+        </div>
+        <div class="er-sub">auto-berechnet</div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="qual-grid">
+      <div class="qual-field">
+        <label class="field-label">✅ Was lief gut?</label>
+        <textarea class="qual-textarea" placeholder="z.B. Hohe Save-Rate, starkes Engagement..."
+          oninput="updateField(${w.id}, 'whatWorked', this.value)">${esc(w.whatWorked)}</textarea>
+      </div>
+      <div class="qual-field">
+        <label class="field-label">❌ Was lief schlecht?</label>
+        <textarea class="qual-textarea" placeholder="z.B. Wenig Link-Klicks, schwache Reach..."
+          oninput="updateField(${w.id}, 'whatDidnt', this.value)">${esc(w.whatDidnt)}</textarea>
+      </div>
+      <div class="qual-field">
+        <label class="field-label">💡 Schlüsse / Next Steps</label>
+        <textarea class="qual-textarea" placeholder="z.B. Nächste Woche frühmorgens posten..."
+          oninput="updateField(${w.id}, 'nextSteps', this.value)">${esc(w.nextSteps)}</textarea>
+      </div>
+    </div>
+  `;
+
+  container.appendChild(div);
+}
+
+// ── Overview ──
+function renderOverview() {
+  const withData = weeks.filter(w => w.reach);
+  const emptyEl = document.getElementById('overview-empty');
+  const contentEl = document.getElementById('overview-content');
+
+  if (withData.length === 0) {
+    emptyEl.style.display = '';
+    contentEl.style.display = 'none';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  contentEl.style.display = '';
+
+  const avg = (key) => {
+    const vals = withData.map(w => parseFloat(w[key]) || 0);
+    return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+  };
+
+  const avgER = (withData.reduce((s, w) => s + (parseFloat(calcER(w)) || 0), 0) / withData.length).toFixed(2);
+
+  const summaryItems = [
+    { label: '⌀ Reach',         value: avg('reach').toLocaleString('de') },
+    { label: '⌀ Impressions',   value: avg('impressions').toLocaleString('de') },
+    { label: '⌀ Likes',         value: avg('likes').toLocaleString('de') },
+    { label: '⌀ Saves',         value: avg('saves').toLocaleString('de') },
+    { label: '⌀ Link-Klicks',   value: avg('linkClicks').toLocaleString('de') },
+    { label: '⌀ Engagement Rate', value: avgER + '%' },
+    { label: 'Posts getrackt',  value: withData.length },
+  ];
+
+  const grid = document.getElementById('stats-grid');
+  grid.innerHTML = summaryItems.map((s, i) => `
+    <div class="stat-card" style="animation-delay:${i * 0.05}s">
+      <div class="stat-label">${s.label}</div>
+      <div class="stat-value">${s.value}</div>
+    </div>
+  `).join('');
+
+  const tbody = document.getElementById('overview-table-body');
+  tbody.innerHTML = withData.map(w => {
+    const er = calcER(w);
+    return `<tr>
+      <td class="week-label">${esc(w.week)}</td>
+      <td class="format-label">${w.format}</td>
+      <td>${fmt(w.reach)}</td>
+      <td>${fmt(w.impressions)}</td>
+      <td>${fmt(w.likes)}</td>
+      <td>${fmt(w.comments)}</td>
+      <td>${fmt(w.saves)}</td>
+      <td>${fmt(w.shares)}</td>
+      <td>${fmt(w.profileVisits)}</td>
+      <td>${fmt(w.linkClicks)}</td>
+      <td class="${er ? 'er-col' : ''}">${er ? er + '%' : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function updateEmptyState() {
+  const empty = document.getElementById('empty-tracker');
+  empty.style.display = weeks.length === 0 ? '' : 'none';
+}
+
+function fmt(v) {
+  const n = parseFloat(v);
+  return (!v || isNaN(n)) ? '—' : n.toLocaleString('de');
+}
+
+function esc(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function resetData() {
+  if (!confirm('Wirklich ALLE Daten unwiderruflich löschen?')) return;
+  weeksRef.set(null)
+    .then(() => {
+      weeks = [];
+      document.getElementById('cards-container').innerHTML = '';
+      updateEmptyState();
+      setSyncStatus('synced', 'gelöscht ✓');
+    })
+    .catch(err => console.error('Reset error:', err));
+}
+
+// ── Start ──
+startRealtimeSync();
+</script>
+</body>
+</html>
