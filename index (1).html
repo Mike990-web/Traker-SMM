@@ -598,50 +598,15 @@
           </table>
         </div>
       </div>
-    </div>
-  </div>
-</main>
-
-<!-- ═══════════════════════════════════════════════════════
-     FIREBASE SDK (v9 compat)
-     ═══════════════════════════════════════════════════════ -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyB7DcFwhKORvbB3sDd7vpXjOOnIngxhjjU",
-  authDomain: "smm-tracker-insta.firebaseapp.com",
-  databaseURL: "https://smm-tracker-insta-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "smm-tracker-insta",
-  storageBucket: "smm-tracker-insta.firebasestorage.app",
-  messagingSenderId: "69706672023",
-  appId: "1:69706672023:web:2fc6d195dd6da18ab2c6d2"
-};
-const firebaseConfig = {
-  apiKey: "AIzaSyB7DcFwhKORvbB3sDd7vpXjOOnIngxhjjU",
-  authDomain: "smm-tracker-insta.firebaseapp.com",
-  databaseURL: "https://smm-tracker-insta-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "smm-tracker-insta",
-  storageBucket: "smm-tracker-insta.firebasestorage.app",
-  messagingSenderId: "69706672023",
-  appId: "1:69706672023:web:2fc6d195dd6da18ab2c6d2"
-};
+const JSONBIN_ID  = '6a29740af5f4af5e29d88ee6';
+const JSONBIN_KEY = '$2a$10$iLBD/dcW0NawYDEVY7TikO.FpFlUDEIBFThDPpVWEku8X9DJZptJy';
+const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
 
-// Pfad in der Datenbank (kann angepasst werden)
-const DB_PATH = 'smm-tracker/weeks';
-
-// ── Firebase Init ──
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-const weeksRef = db.ref(DB_PATH);
-
-let weeks = [];
+let weeks   = [];
 let counter = 0;
 let saveTimeout = null;
-let isInitialized = false;
-let localSaveInProgress = false;
-let localSaveTimer = null;
 
 const METRICS = [
   { key: 'reach',         label: '👁️ Reach' },
@@ -653,94 +618,56 @@ const METRICS = [
   { key: 'profileVisits', label: '👤 Profil-Besuche' },
   { key: 'linkClicks',    label: '🔗 Link-Klicks' },
 ];
-
 const FORMATS = ['Reel', 'Carousel', 'Static Post', 'Story'];
 
 // ── Sync Indicator ──
 function setSyncStatus(status, text) {
   const el = document.getElementById('sync-indicator');
+  if (!el) return;
   const textEl = el.querySelector('.sync-text');
   el.className = 'sync-indicator ' + status;
-  textEl.textContent = text;
+  if (textEl) textEl.textContent = text;
 }
 
-// ── Firebase Save (debounced) ──
+// ── Load from JSONBin ──
+async function load() {
+  try {
+    const res = await fetch(JSONBIN_URL + '/latest', {
+      headers: { 'X-Access-Key': JSONBIN_KEY }
+    });
+    const json = await res.json();
+    const data = json.record;
+    weeks = Array.isArray(data) ? data : [];
+  } catch(e) {
+    console.error('Load error:', e);
+    weeks = [];
+  }
+}
+
+// ── Save to JSONBin (debounced) ──
 function save() {
+  setSyncStatus('syncing', 'speichert…');
   if (saveTimeout) clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(() => {
-    setSyncStatus('syncing', 'speichert…');
-    // Block re-render from own save echo
-    localSaveInProgress = true;
-    if (localSaveTimer) clearTimeout(localSaveTimer);
-    localSaveTimer = setTimeout(() => { localSaveInProgress = false; }, 2000);
-
-    weeksRef.set(weeks)
-      .then(() => {
-        setSyncStatus('live', 'live sync ✓');
-      })
-      .catch(err => {
-        console.error('Save error:', err);
-        setSyncStatus('error', 'Fehler!');
-        localSaveInProgress = false;
+  saveTimeout = setTimeout(async () => {
+    try {
+      const res = await fetch(JSONBIN_URL, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Access-Key': JSONBIN_KEY
+        },
+        body: JSON.stringify(weeks)
       });
-  }, 400);
-}
-
-// ── Firebase Realtime Listener ──
-function startRealtimeSync() {
-  weeksRef.on('value', (snapshot) => {
-    const data = snapshot.val();
-
-    // On initial load: always render
-    if (!isInitialized) {
-      if (data && Array.isArray(data)) {
-        weeks = data;
+      if (res.ok) {
+        setSyncStatus('live', 'gespeichert ✓');
       } else {
-        weeks = [];
+        setSyncStatus('error', 'Fehler!');
       }
-      document.getElementById('cards-container').innerHTML = '';
-      weeks.forEach(w => renderCard(w, false));
-      updateEmptyState();
-
-      isInitialized = true;
-      const overlay = document.getElementById('loading-overlay');
-      overlay.classList.add('hidden');
-      setTimeout(() => overlay.remove(), 500);
-      setSyncStatus('live', 'live sync ✓');
-      return;
+    } catch(e) {
+      console.error('Save error:', e);
+      setSyncStatus('error', 'Fehler!');
     }
-
-    // Skip re-render if this is our own save echoing back
-    if (localSaveInProgress) {
-      localSaveInProgress = false;
-      return;
-    }
-
-    // External change from another device → full re-render
-    if (data && Array.isArray(data)) {
-      weeks = data;
-    } else {
-      weeks = [];
-    }
-    document.getElementById('cards-container').innerHTML = '';
-    weeks.forEach(w => renderCard(w, false));
-    updateEmptyState();
-
-    const overviewActive = document.getElementById('view-overview').classList.contains('active');
-    if (overviewActive) renderOverview();
-
-    setSyncStatus('live', 'live sync ✓');
-  }, (err) => {
-    console.error('Realtime sync error:', err);
-    setSyncStatus('error', 'Verbindungsfehler');
-
-    if (!isInitialized) {
-      isInitialized = true;
-      const overlay = document.getElementById('loading-overlay');
-      overlay.classList.add('hidden');
-      setTimeout(() => overlay.remove(), 500);
-    }
-  });
+  }, 600);
 }
 
 function getWeek(id) { return weeks.find(w => w.id === id); }
@@ -759,9 +686,8 @@ function switchView(name) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('view-' + name).classList.add('active');
   document.querySelectorAll('.tab-btn').forEach(b => {
-    if (b.textContent.toLowerCase().includes(name === 'tracker' ? 'tracker' : 'blick')) {
+    if (b.textContent.toLowerCase().includes(name === 'tracker' ? 'tracker' : 'blick'))
       b.classList.add('active');
-    }
   });
   if (name === 'overview') renderOverview();
 }
@@ -773,9 +699,7 @@ function addWeek() {
     id: Date.now() + counter,
     index: weeks.length + 1,
     week: 'Woche ' + (weeks.length + 1),
-    date: '',
-    format: 'Reel',
-    caption: '',
+    date: '', format: 'Reel', caption: '',
     reach: '', impressions: '', likes: '', comments: '',
     saves: '', shares: '', profileVisits: '', linkClicks: '',
     whatWorked: '', whatDidnt: '', nextSteps: '',
@@ -800,24 +724,17 @@ function updateField(id, key, value) {
   if (!w) return;
   w[key] = value;
   save();
-  const erBadge = document.getElementById('er-badge-' + id);
+  const erBadge   = document.getElementById('er-badge-' + id);
   const erDisplay = document.getElementById('er-display-' + id);
   const er = calcER(w);
-  if (erBadge) {
-    erBadge.style.display = er ? '' : 'none';
-    erBadge.textContent = 'ER: ' + er + '%';
-  }
-  if (erDisplay) {
-    erDisplay.textContent = er ? er + '%' : '—';
-    erDisplay.className = 'er-display' + (er ? '' : ' empty');
-  }
+  if (erBadge)   { erBadge.style.display = er ? '' : 'none'; erBadge.textContent = 'ER: ' + er + '%'; }
+  if (erDisplay) { erDisplay.textContent = er ? er + '%' : '—'; erDisplay.className = 'er-display' + (er ? '' : ' empty'); }
 }
 
 // ── Render Card ──
 function renderCard(w, animate) {
   const container = document.getElementById('cards-container');
   const er = calcER(w);
-
   const div = document.createElement('div');
   div.className = 'week-card';
   div.id = 'card-' + w.id;
@@ -858,7 +775,6 @@ function renderCard(w, animate) {
         <button class="delete-btn" onclick="deleteWeek(${w.id})" title="Löschen">✕</button>
       </div>
     </div>
-
     <div class="meta-row">
       <div class="meta-field">
         <label class="field-label">Format</label>
@@ -871,7 +787,6 @@ function renderCard(w, animate) {
           oninput="updateField(${w.id}, 'caption', this.value)">
       </div>
     </div>
-
     <div class="metrics-grid">
       ${metricCells}
       <div class="metric-cell er-cell">
@@ -882,122 +797,96 @@ function renderCard(w, animate) {
         <div class="er-sub">auto-berechnet</div>
       </div>
     </div>
-
     <div class="section-divider"></div>
-
     <div class="qual-grid">
       <div class="qual-field">
         <label class="field-label">✅ Was lief gut?</label>
-        <textarea class="qual-textarea" placeholder="z.B. Hohe Save-Rate, starkes Engagement..."
+        <textarea class="qual-textarea" placeholder="z.B. Hohe Save-Rate..."
           oninput="updateField(${w.id}, 'whatWorked', this.value)">${esc(w.whatWorked)}</textarea>
       </div>
       <div class="qual-field">
         <label class="field-label">❌ Was lief schlecht?</label>
-        <textarea class="qual-textarea" placeholder="z.B. Wenig Link-Klicks, schwache Reach..."
+        <textarea class="qual-textarea" placeholder="z.B. Wenig Link-Klicks..."
           oninput="updateField(${w.id}, 'whatDidnt', this.value)">${esc(w.whatDidnt)}</textarea>
       </div>
       <div class="qual-field">
         <label class="field-label">💡 Schlüsse / Next Steps</label>
-        <textarea class="qual-textarea" placeholder="z.B. Nächste Woche frühmorgens posten..."
+        <textarea class="qual-textarea" placeholder="z.B. Nächste Woche früher posten..."
           oninput="updateField(${w.id}, 'nextSteps', this.value)">${esc(w.nextSteps)}</textarea>
       </div>
     </div>
   `;
-
   container.appendChild(div);
 }
 
 // ── Overview ──
 function renderOverview() {
   const withData = weeks.filter(w => w.reach);
-  const emptyEl = document.getElementById('overview-empty');
+  const emptyEl   = document.getElementById('overview-empty');
   const contentEl = document.getElementById('overview-content');
+  if (withData.length === 0) { emptyEl.style.display = ''; contentEl.style.display = 'none'; return; }
+  emptyEl.style.display = 'none'; contentEl.style.display = '';
 
-  if (withData.length === 0) {
-    emptyEl.style.display = '';
-    contentEl.style.display = 'none';
-    return;
-  }
-  emptyEl.style.display = 'none';
-  contentEl.style.display = '';
+  const avg = key => Math.round(withData.map(w => parseFloat(w[key]) || 0).reduce((a,b) => a+b, 0) / withData.length);
+  const avgER = (withData.reduce((s,w) => s + (parseFloat(calcER(w)) || 0), 0) / withData.length).toFixed(2);
 
-  const avg = (key) => {
-    const vals = withData.map(w => parseFloat(w[key]) || 0);
-    return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
-  };
-
-  const avgER = (withData.reduce((s, w) => s + (parseFloat(calcER(w)) || 0), 0) / withData.length).toFixed(2);
-
-  const summaryItems = [
-    { label: '⌀ Reach',         value: avg('reach').toLocaleString('de') },
-    { label: '⌀ Impressions',   value: avg('impressions').toLocaleString('de') },
-    { label: '⌀ Likes',         value: avg('likes').toLocaleString('de') },
-    { label: '⌀ Saves',         value: avg('saves').toLocaleString('de') },
-    { label: '⌀ Link-Klicks',   value: avg('linkClicks').toLocaleString('de') },
+  document.getElementById('stats-grid').innerHTML = [
+    { label: '⌀ Reach',           value: avg('reach').toLocaleString('de') },
+    { label: '⌀ Impressions',     value: avg('impressions').toLocaleString('de') },
+    { label: '⌀ Likes',           value: avg('likes').toLocaleString('de') },
+    { label: '⌀ Saves',           value: avg('saves').toLocaleString('de') },
+    { label: '⌀ Link-Klicks',     value: avg('linkClicks').toLocaleString('de') },
     { label: '⌀ Engagement Rate', value: avgER + '%' },
-    { label: 'Posts getrackt',  value: withData.length },
-  ];
-
-  const grid = document.getElementById('stats-grid');
-  grid.innerHTML = summaryItems.map((s, i) => `
-    <div class="stat-card" style="animation-delay:${i * 0.05}s">
+    { label: 'Posts getrackt',    value: withData.length },
+  ].map((s,i) => `
+    <div class="stat-card" style="animation-delay:${i*0.05}s">
       <div class="stat-label">${s.label}</div>
       <div class="stat-value">${s.value}</div>
-    </div>
-  `).join('');
+    </div>`).join('');
 
-  const tbody = document.getElementById('overview-table-body');
-  tbody.innerHTML = withData.map(w => {
+  document.getElementById('overview-table-body').innerHTML = withData.map(w => {
     const er = calcER(w);
     return `<tr>
       <td class="week-label">${esc(w.week)}</td>
       <td class="format-label">${w.format}</td>
-      <td>${fmt(w.reach)}</td>
-      <td>${fmt(w.impressions)}</td>
-      <td>${fmt(w.likes)}</td>
-      <td>${fmt(w.comments)}</td>
-      <td>${fmt(w.saves)}</td>
-      <td>${fmt(w.shares)}</td>
-      <td>${fmt(w.profileVisits)}</td>
-      <td>${fmt(w.linkClicks)}</td>
-      <td class="${er ? 'er-col' : ''}">${er ? er + '%' : '—'}</td>
+      <td>${fmt(w.reach)}</td><td>${fmt(w.impressions)}</td>
+      <td>${fmt(w.likes)}</td><td>${fmt(w.comments)}</td>
+      <td>${fmt(w.saves)}</td><td>${fmt(w.shares)}</td>
+      <td>${fmt(w.profileVisits)}</td><td>${fmt(w.linkClicks)}</td>
+      <td class="${er ? 'er-col' : ''}">${er ? er+'%' : '—'}</td>
     </tr>`;
   }).join('');
 }
 
 function updateEmptyState() {
-  const empty = document.getElementById('empty-tracker');
-  empty.style.display = weeks.length === 0 ? '' : 'none';
+  document.getElementById('empty-tracker').style.display = weeks.length === 0 ? '' : 'none';
 }
 
-function fmt(v) {
-  const n = parseFloat(v);
-  return (!v || isNaN(n)) ? '—' : n.toLocaleString('de');
-}
+function fmt(v) { const n = parseFloat(v); return (!v || isNaN(n)) ? '—' : n.toLocaleString('de'); }
 
 function esc(str) {
   if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function resetData() {
   if (!confirm('Wirklich ALLE Daten unwiderruflich löschen?')) return;
-  weeksRef.set(null)
-    .then(() => {
-      weeks = [];
-      document.getElementById('cards-container').innerHTML = '';
-      updateEmptyState();
-      setSyncStatus('synced', 'gelöscht ✓');
-    })
-    .catch(err => console.error('Reset error:', err));
+  weeks = [];
+  save();
+  document.getElementById('cards-container').innerHTML = '';
+  updateEmptyState();
 }
 
-// ── Start ──
-startRealtimeSync();
+// ── Init ──
+(async () => {
+  setSyncStatus('syncing', 'lädt…');
+  await load();
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) { overlay.classList.add('hidden'); setTimeout(() => overlay.remove(), 500); }
+  weeks.forEach(w => renderCard(w, false));
+  updateEmptyState();
+  setSyncStatus('live', 'live sync ✓');
+})();
 </script>
 </body>
 </html>
